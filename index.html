@@ -1,1 +1,496 @@
 <H1>STOCK</H1>
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 智慧永續證券查詢系統</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+        /* --- 專業、暖色系、柔和色調 CSS (部分沿用與優化) --- */
+        :root {
+            --color-primary: #FFB3A1; /* 柔和珊瑚/暖橘 */
+            --color-background: #F2F4F7; /* 極淺米灰，柔和護眼 */
+            --color-accent: #37A39B; /* 專業青色/藍綠色 */
+            
+            --color-text-dark: #3A4750;
+            --color-text-light: #5B6D80;
+            --color-surface: #FFFFFF;
+            --color-border: #E0E4E7;
+            --header-height: 60px;
+        }
+
+        body {
+            font-family: 'Open Sans', '微軟正黑體', sans-serif;
+            background-color: var(--color-background);
+            margin: 0;
+            padding: 0;
+            color: var(--color-text-dark);
+            line-height: 1.6;
+        }
+
+        /* ------------------------- 佈局與通用區塊 ------------------------- */
+        /* (佈局與卡片樣式與前次相同，為節省篇幅省略重複 CSS) */
+        .container { max-width: 1400px; margin: 0 auto; padding: 30px 20px; }
+        .header { background-color: var(--color-surface); color: var(--color-text-dark); height: var(--header-height); display: flex; align-items: center; padding: 0 40px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); position: sticky; top: 0; z-index: 1000; }
+        .header h1 { margin: 0; font-size: 26px; font-weight: 700; color: var(--color-primary); }
+        .main-content { display: flex; gap: 30px; margin-top: 30px; }
+        .sidebar { width: 320px; background-color: var(--color-surface); padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08); height: fit-content; }
+        .content-area { flex-grow: 1; }
+        .card { background-color: var(--color-surface); padding: 25px; margin-bottom: 25px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08); border: 1px solid var(--color-border); }
+        .card h3 { border-left: 5px solid var(--color-accent); padding-left: 12px; color: var(--color-text-dark); margin-top: 0; margin-bottom: 20px; font-size: 20px; font-weight: 600; }
+        
+        select, input[type="text"], button {
+            width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid var(--color-border); border-radius: 6px; box-sizing: border-box; font-size: 16px; transition: border-color 0.3s;
+        }
+        button { background-color: var(--color-primary); color: var(--color-surface); font-weight: 600; cursor: pointer; transition: background-color 0.3s ease, box-shadow 0.3s ease; }
+        button:hover:not(:disabled) { background-color: #E6A090; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
+        button:disabled { background-color: #EAEAEA; color: var(--color-text-light); cursor: not-allowed; border: none; }
+        
+        .index-box { display: flex; justify-content: space-between; margin-bottom: 10px; padding: 12px 15px; background-color: #FFF5F0; border-left: 4px solid var(--color-primary); border-radius: 4px; font-weight: 600; color: var(--color-text-dark); }
+        .esg-indicator { padding: 12px 5px; border-bottom: 1px dashed var(--color-border); cursor: pointer; transition: background-color 0.2s; }
+        .esg-indicator:hover { background-color: #F8F8F8; }
+        .esg-indicator:last-child { border-bottom: none; }
+        .esg-score { font-weight: 700; color: var(--color-accent); font-size: 20px; }
+        
+        .news-item { border-bottom: 1px solid var(--color-border); padding: 12px 0; transition: background-color 0.2s; }
+        .news-title { font-weight: 600; color: var(--color-text-dark); line-height: 1.5; }
+        .news-meta { font-size: 13px; color: var(--color-text-light); margin-top: 5px; }
+        
+        .hidden { display: none; }
+
+        /* ------------------------- MODAL 樣式 ------------------------- */
+
+        .modal {
+            position: fixed;
+            z-index: 2000; /* 確保在最上層 */
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.4); /* 半透明黑色背景 */
+            display: none; /* 預設隱藏 */
+        }
+
+        .modal-content {
+            background-color: var(--color-surface);
+            margin: 10% auto; /* 垂直居中 */
+            padding: 30px;
+            border: 1px solid var(--color-border);
+            width: 80%;
+            max-width: 600px;
+            border-radius: 12px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            animation-name: animatetop;
+            animation-duration: 0.4s;
+        }
+
+        @keyframes animatetop {
+            from {top: -300px; opacity: 0}
+            to {top: 0; opacity: 1}
+        }
+
+        .close-button {
+            color: var(--color-text-light);
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            line-height: 1;
+            transition: color 0.3s;
+        }
+
+        .close-button:hover,
+        .close-button:focus {
+            color: var(--color-primary);
+            text-decoration: none;
+            cursor: pointer;
+        }
+        
+        .stock-list-item {
+            padding: 10px;
+            border-bottom: 1px solid var(--color-border);
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .stock-list-item:hover {
+            background-color: #F8F8F8;
+        }
+        .stock-list-item:last-child {
+            border-bottom: none;
+        }
+        .stock-list-item.selected {
+            background-color: var(--color-primary);
+            color: white;
+            font-weight: 600;
+        }
+
+    </style>
+</head>
+<body>
+
+    <header class="header">
+        <h1>AI 智慧永續證券查詢系統</h1>
+    </header>
+
+    <div class="container">
+        <div class="main-content">
+            
+            <aside class="sidebar">
+                
+                <div class="card">
+                    <h3>GEMINI API 金鑰設定</h3>
+                    <input type="text" id="api-key" placeholder="輸入您的 GEMINI API 金鑰">
+                    <button id="api-button" onclick="verifyApiKey()">驗證並啟用</button>
+                    <p id="api-status" style="font-size: 13px; color: var(--color-text-light);">狀態：未驗證</p>
+                </div>
+                
+                <div class="card">
+                    <h3>市場指數即時概覽</h3>
+                    <div id="index-data">
+                        <div class="index-box">
+                            <span>臺灣加權指數</span>
+                            <span id="tse-index">--</span>
+                        </div>
+                        <div class="index-box">
+                            <span>櫃買指數</span>
+                            <span id="otc-index">--</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>查詢與自選股管理</h3>
+                    <p>目前公司：<strong id="current-stock-display">未選擇</strong></p>
+                    <button id="select-stock-btn" onclick="openStockModal()" disabled>選擇/更換查詢公司</button>
+                    <select id="stock-selector" class="hidden"></select> 
+                </div>
+
+                <div class="card hidden" id="esg-card">
+                    <h3>永續經營指標 (ESG)</h3>
+                    <div id="esg-metrics">
+                        <div class="esg-indicator" data-section="kline" onclick="showSection('kline')">
+                            <p>MSCI 評級：<span class="esg-score" id="msci-rating">--</span></p>
+                        </div>
+                        <div class="esg-indicator" data-section="kline" onclick="showSection('kline')">
+                            <p>公司治理分數：<span class="esg-score" id="governance-score">--</span></p>
+                        </div>
+                        <div class="esg-indicator" data-section="kline" onclick="showSection('kline')">
+                            <p>碳排放強度：<span class="esg-score" id="carbon-intensity">--</span></p>
+                        </div>
+                    </div>
+                </div>
+
+            </aside>
+
+            <section class="content-area">
+                
+                <div class="card hidden" id="kline-card">
+                    <h3 id="kline-title">個股 K 線圖：[公司名稱] (點擊圖表查看新聞)</h3>
+                    <div id="kline-chart" onclick="showSection('news')" style="width: 100%; height: 500px; cursor: pointer;">
+                        <p id="kline-placeholder" style="text-align: center; line-height: 500px; color: var(--color-text-light);">點擊左側任一永續指標，載入該公司的 K 線圖</p>
+                    </div>
+                </div>
+                
+                <div class="card hidden" id="news-card">
+                    <h3>最新新聞報導</h3>
+                    <div id="news-list">
+                        <p style="color: var(--color-text-light);">請先點擊上方 K 線圖，以載入相關新聞。</p>
+                    </div>
+                </div>
+                
+                <div class="card" id="welcome-card">
+                    <h3>歡迎使用 AI 智慧永續證券查詢系統</h3>
+                    <p style="color: var(--color-text-light);">本系統提供專業、多維度的股票分析。請先輸入您的 **API 金鑰** 進行驗證，並點擊 **「選擇/更換查詢公司」** 按鈕來開始您的分析。</p>
+                </div>
+
+            </section>
+        </div>
+    </div>
+
+    <div id="stockModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" onclick="closeStockModal()">&times;</span>
+            <h3>選擇查詢公司</h3>
+            <input type="text" id="stock-search" onkeyup="filterStockList()" placeholder="輸入股票代碼或公司名稱進行搜索...">
+            
+            <div id="stock-list-container" style="max-height: 300px; overflow-y: auto; border: 1px solid var(--color-border); border-radius: 6px;">
+                </div>
+            
+            <button style="margin-top: 20px;" onclick="confirmStockSelection()">確認選擇</button>
+        </div>
+    </div>
+    <script>
+        // ----------------------------------------------------
+        // I. 模擬數據
+        // ----------------------------------------------------
+        const MOCK_INDEX_DATA = {
+            tse: '21050.88 (+120.50)',
+            otc: '255.15 (+0.95)'
+        };
+
+        const MOCK_ALL_STOCKS = [
+            { code: '2330', name: '台積電', sector: '半導體' },
+            { code: '2454', name: '聯發科', sector: 'IC設計' },
+            { code: '2881', name: '富邦金', sector: '金融保險' },
+            { code: '2317', name: '鴻海', sector: '電子代工' },
+            { code: '0050', name: '元大台灣50', sector: 'ETF' },
+            { code: '2603', name: '長榮', sector: '航運業' },
+        ];
+        
+        const MOCK_ESG_DATA = {
+            '2330': { msci: 'AAA', governance: '95 / 100', carbon: '0.8 (低)', name: '台積電' },
+            '2454': { msci: 'A', governance: '88 / 100', carbon: '1.5 (中)', name: '聯發科' },
+            '2881': { msci: 'AA', governance: '92 / 100', carbon: '0.1 (極低)', name: '富邦金' },
+            '2317': { msci: 'BBB', governance: '80 / 100', carbon: '3.2 (高)', name: '鴻海' },
+            '0050': { msci: 'AA', governance: '90 / 100', carbon: '1.0 (中)', name: '元大台灣50' },
+            '2603': { msci: 'B', governance: '75 / 100', carbon: '5.5 (極高)', name: '長榮' }
+        };
+
+        const MOCK_KLINE_DATA = {
+            // 簡化數據，實際應為上市至今的歷史數據
+            '2330': [['2024/01/01', 580, 600, 575, 610], ['2024/01/02', 605, 615, 600, 620], ['2024/01/05', 628, 635, 625, 640]],
+            '2454': [['2024/01/01', 900, 910, 895, 915], ['2024/01/03', 906, 890, 885, 907], ['2024/01/05', 900, 918, 898, 920]],
+            '2881': [['2024/01/01', 65, 66, 64.5, 66.5], ['2024/01/04', 66, 67, 65.9, 67.5], ['2024/01/05', 67.2, 67.5, 67, 68]]
+            // ... 更多 K 線數據
+        };
+
+        const MOCK_NEWS_DATA = {
+            '2330': [{ time: '2025/10/21 15:00', title: '台積電宣布下一代 2 奈米製程將聚焦永續能源應用' }],
+            '2454': [{ time: '2025/10/21 12:30', title: '聯發科手機晶片出貨量創紀錄，展望樂觀' }],
+            '2881': [{ time: '2025/10/21 09:00', title: '富邦金控Q3獲利穩健，永續金融業務成長 20%' }]
+            // ... 更多新聞數據
+        };
+
+        // ----------------------------------------------------
+        // II. 全域狀態與控制
+        // ----------------------------------------------------
+        let isApiKeyValid = false;
+        let currentStockCode = '';
+        let currentStockName = '';
+        let kLineChart = null; 
+
+        // ----------------------------------------------------
+        // III. MODAL 互動功能
+        // ----------------------------------------------------
+
+        /**
+         * 開啟公司選擇 Modal
+         */
+        function openStockModal() {
+            if (!isApiKeyValid) return;
+            document.getElementById('stockModal').style.display = 'block';
+            renderStockList(MOCK_ALL_STOCKS); // 載入所有股票列表
+        }
+
+        /**
+         * 關閉公司選擇 Modal
+         */
+        function closeStockModal() {
+            document.getElementById('stockModal').style.display = 'none';
+        }
+
+        /**
+         * 繪製公司列表
+         */
+        function renderStockList(stocks) {
+            const container = document.getElementById('stock-list-container');
+            container.innerHTML = '';
+            stocks.forEach(stock => {
+                const item = document.createElement('div');
+                item.className = 'stock-list-item';
+                item.textContent = `${stock.code} ${stock.name} (${stock.sector})`;
+                item.setAttribute('data-code', stock.code);
+                item.setAttribute('data-name', stock.name);
+                
+                // 點擊事件：選中
+                item.onclick = function() {
+                    // 清除所有已選中狀態
+                    document.querySelectorAll('.stock-list-item').forEach(el => el.classList.remove('selected'));
+                    // 設置選中狀態
+                    this.classList.add('selected');
+                };
+                container.appendChild(item);
+            });
+        }
+
+        /**
+         * 篩選公司列表
+         */
+        function filterStockList() {
+            const searchTerm = document.getElementById('stock-search').value.toLowerCase();
+            const filteredStocks = MOCK_ALL_STOCKS.filter(stock => 
+                stock.code.includes(searchTerm) || stock.name.includes(searchTerm) || stock.sector.includes(searchTerm)
+            );
+            renderStockList(filteredStocks);
+        }
+
+        /**
+         * 確認選擇公司
+         */
+        function confirmStockSelection() {
+            const selectedItem = document.querySelector('.stock-list-item.selected');
+            if (selectedItem) {
+                const code = selectedItem.getAttribute('data-code');
+                const name = selectedItem.getAttribute('data-name');
+                
+                currentStockCode = code;
+                currentStockName = name;
+
+                document.getElementById('current-stock-display').textContent = `${code} ${name}`;
+                loadCompanyData(code); // 載入 ESG 資料
+                closeStockModal();
+            } else {
+                alert('請選擇一家公司！');
+            }
+        }
+        
+        // 點擊 Modal 外部關閉
+        window.onclick = function(event) {
+            const modal = document.getElementById('stockModal');
+            if (event.target == modal) {
+                closeStockModal();
+            }
+        }
+
+        // ----------------------------------------------------
+        // IV. 核心功能 (保持與上次提交的程式碼一致)
+        // ----------------------------------------------------
+
+        function verifyApiKey() {
+            const apiKey = document.getElementById('api-key').value.trim();
+            const statusText = document.getElementById('api-status');
+            const selectBtn = document.getElementById('select-stock-btn');
+            const apiButton = document.getElementById('api-button');
+            const welcomeCard = document.getElementById('welcome-card');
+
+            if (apiKey.length >= 5) {
+                isApiKeyValid = true;
+                statusText.innerHTML = '狀態：已驗證，功能已解鎖。';
+                statusText.style.color = 'var(--color-accent)';
+                selectBtn.disabled = false; // 啟用選擇公司按鈕
+                apiButton.disabled = true;
+                apiButton.textContent = '已啟用';
+                
+                loadIndexData();
+                welcomeCard.classList.add('hidden');
+                alert('API 金鑰驗證成功！請點擊「選擇/更換查詢公司」按鈕來開始您的分析。');
+
+            } else {
+                isApiKeyValid = false;
+                statusText.innerHTML = '狀態：驗證失敗，請重新輸入。';
+                statusText.style.color = 'red';
+                selectBtn.disabled = true;
+                apiButton.disabled = false;
+            }
+        }
+        
+        function loadIndexData() {
+            document.getElementById('tse-index').textContent = MOCK_INDEX_DATA.tse;
+            document.getElementById('otc-index').textContent = MOCK_INDEX_DATA.otc;
+        }
+
+        /**
+         * 載入公司數據 (由 confirmStockSelection 呼叫)
+         */
+        function loadCompanyData(code) {
+            const esgData = MOCK_ESG_DATA[code];
+            if (!esgData) {
+                 alert('抱歉，此公司暫無 ESG 資料！');
+                 document.getElementById('esg-card').classList.add('hidden');
+                 return;
+            }
+
+            // 顯示 ESG 卡片並更新內容
+            document.getElementById('esg-card').classList.remove('hidden');
+            document.getElementById('msci-rating').textContent = esgData.msci;
+            document.getElementById('governance-score').textContent = esgData.governance;
+            document.getElementById('carbon-intensity').textContent = esgData.carbon;
+
+            // 清空 K 線和新聞
+            document.getElementById('kline-card').classList.add('hidden');
+            document.getElementById('news-card').classList.add('hidden');
+        }
+
+        function showSection(sectionId) {
+            document.getElementById('kline-card').classList.add('hidden');
+            document.getElementById('news-card').classList.add('hidden');
+
+            if (sectionId === 'kline') {
+                if (currentStockCode) {
+                    document.getElementById('kline-card').classList.remove('hidden');
+                    drawKlineChart(currentStockCode);
+                }
+            } else if (sectionId === 'news') {
+                if (currentStockCode) {
+                    document.getElementById('news-card').classList.remove('hidden');
+                    loadNewsData(currentStockCode);
+                }
+            }
+        }
+        
+        function drawKlineChart(code) {
+            const chartDom = document.getElementById('kline-chart');
+            if (!kLineChart) {
+                kLineChart = echarts.init(chartDom);
+            }
+            document.getElementById('kline-placeholder').classList.add('hidden');
+            
+            const rawData = MOCK_KLINE_DATA[code] || [];
+            const dates = rawData.map(item => item[0]);
+            const values = rawData.map(item => [item[1], item[2], item[3], item[4]]); 
+
+            document.getElementById('kline-title').textContent = `${code} ${currentStockName} K 線圖 (上市至今歷史回顧 - 點擊圖表查看新聞)`;
+
+            const option = {
+                color: ['var(--color-accent)'],
+                tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
+                grid: { left: '10%', right: '10%', bottom: '15%' },
+                xAxis: { data: dates, scale: true, boundaryGap: false, axisLabel: { color: 'var(--color-text-light)' } },
+                yAxis: { scale: true, splitLine: { lineStyle: { color: 'var(--color-border)' } }, axisLabel: { color: 'var(--color-text-light)' } },
+                dataZoom: [{ type: 'inside', start: 50, end: 100 }, { show: true, type: 'slider', bottom: 10, start: 50, end: 100, textStyle: { color: 'var(--color-text-light)' } }],
+                series: [{
+                        type: 'candlestick',
+                        name: currentStockName,
+                        data: values,
+                        itemStyle: {
+                            color: '#e63232', color0: '#14A532', borderColor: '#e63232', borderColor0: '#14A532'
+                        }
+                    }]
+            };
+            kLineChart.setOption(option);
+        }
+
+        function loadNewsData(code) {
+            const newsListContainer = document.getElementById('news-list');
+            const newsData = MOCK_NEWS_DATA[code];
+
+            newsListContainer.innerHTML = '';
+            
+            if (newsData && newsData.length > 0) {
+                newsData.forEach(news => {
+                    const isPositive = Math.random() > 0.3;
+                    const emotionText = isPositive ? '正面' : '負面';
+                    const emotionColor = isPositive ? '#14A532' : '#e63232'; 
+
+                    const item = document.createElement('div');
+                    item.className = 'news-item';
+                    item.innerHTML = `
+                        <div class="news-title">${news.title}</div>
+                        <div class="news-meta">時間：${news.time} | 來源：系統新聞網 | 情緒：<span style="color: ${emotionColor}; font-weight: 600;">${emotionText}</span></div>
+                    `;
+                    newsListContainer.appendChild(item);
+                });
+            } else {
+                newsListContainer.innerHTML = '<p style="color: var(--color-text-light);">無最新新聞報導。</p>';
+            }
+        }
+        
+        // 初始載入公司列表到 Modal
+        document.addEventListener('DOMContentLoaded', () => {
+            renderStockList(MOCK_ALL_STOCKS);
+        });
+
+    </script>
+</body>
+</html>
